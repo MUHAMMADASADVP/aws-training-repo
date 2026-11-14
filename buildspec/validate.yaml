@@ -17,3 +17,7 @@ phases:
         aws cloudformation validate-template \
           --template-body file://cloudformation/dynamodb-table.yaml
       - echo "Validation completed successfully"
+
+artifacts:
+  files:
+    - cloudformation/dynamodb-table.yaml
