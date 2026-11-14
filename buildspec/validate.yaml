@@ -1,0 +1,19 @@
+
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.11
+    commands:
+      - pip install cfn-lint
+
+  build:
+    commands:
+      - echo "Validating CloudFormation templates..."
+      - cfn-lint cloudformation/dynamodb-table.yaml
+      - echo "Running AWS template validation..."
+      - |
+        aws cloudformation validate-template \
+          --template-body file://cloudformation/dynamodb-table.yaml
+      - echo "Validation completed successfully"

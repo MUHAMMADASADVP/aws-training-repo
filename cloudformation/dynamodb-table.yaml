@@ -1,0 +1,113 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Sample DynamoDB table (orders) with PK, SK, one GSI, backups, encryption and TTL
+
+# ---------------------------------------------------------------------------
+# PARAMETERS: values you pass in at deploy time, so one file works for all envs
+# ---------------------------------------------------------------------------
+Parameters:
+  Env:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+    Description: Environment name, used in the table name
+
+  TableBaseName:
+    Type: String
+    Default: orders
+    Description: Base name of the table (final name = <base>-<env>)
+
+# ---------------------------------------------------------------------------
+# CONDITIONS: switch settings depending on environment
+# ---------------------------------------------------------------------------
+Conditions:
+  IsProd: !Equals [!Ref Env, prod]
+
+# ---------------------------------------------------------------------------
+# RESOURCES: the actual table
+# ---------------------------------------------------------------------------
+Resources:
+  OrdersTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain          # keep the table even if the stack is deleted
+    UpdateReplacePolicy: Retain     # keep the old table if a change forces replacement
+    Properties:
+
+      # 1. TABLE NAME  ->  e.g. orders-dev
+      TableName: !Sub "${TableBaseName}-${Env}"
+
+      # 2. ATTRIBUTES: declare ONLY attributes used in keys or indexes
+      #    S = String, N = Number, B = Binary
+      AttributeDefinitions:
+        - AttributeName: customerId
+          AttributeType: S
+        - AttributeName: orderId
+          AttributeType: S
+        - AttributeName: status
+          AttributeType: S
+        - AttributeName: createdAt
+          AttributeType: S
+
+      # 3. PRIMARY KEY
+      #    HASH  = Partition Key (PK)
+      #    RANGE = Sort Key (SK)
+      KeySchema:
+        - AttributeName: customerId
+          KeyType: HASH
+        - AttributeName: orderId
+          KeyType: RANGE
+
+      # 4. CAPACITY ("size"): on-demand, AWS scales automatically
+      BillingMode: PAY_PER_REQUEST
+
+      # To use provisioned capacity instead, remove BillingMode above and add:
+      # BillingMode: PROVISIONED
+      # ProvisionedThroughput:
+      #   ReadCapacityUnits: 5
+      #   WriteCapacityUnits: 5
+      # (and add the same ProvisionedThroughput block inside each GSI)
+
+      # 5. GLOBAL SECONDARY INDEX: query orders by status, sorted by createdAt
+      GlobalSecondaryIndexes:
+        - IndexName: status-createdAt-index
+          KeySchema:
+            - AttributeName: status
+              KeyType: HASH
+            - AttributeName: createdAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL     # or KEYS_ONLY / INCLUDE
+
+      # 6. BACKUP: point-in-time recovery (restore to any second in last 35 days)
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+
+      # 7. ENCRYPTION at rest
+      SSESpecification:
+        SSEEnabled: true
+
+      # 8. TTL: items auto-delete when the "expiresAt" attribute (epoch seconds) passes
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+
+      # 9. PROTECTION: block accidental deletes in prod
+      DeletionProtectionEnabled: !If [IsProd, true, false]
+
+      # 10. TAGS: for cost tracking and ownership
+      Tags:
+        - Key: Environment
+          Value: !Ref Env
+        - Key: ManagedBy
+          Value: cloudformation
+
+# ---------------------------------------------------------------------------
+# OUTPUTS: values shown after deploy (other stacks can import them)
+# ---------------------------------------------------------------------------
+Outputs:
+  TableName:
+    Description: Name of the DynamoDB table
+    Value: !Ref OrdersTable
+
+  TableArn:
+    Description: ARN of the DynamoDB table
+    Value: !GetAtt OrdersTable.Arn
