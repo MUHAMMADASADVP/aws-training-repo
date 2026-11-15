@@ -13,7 +13,7 @@ Parameters:
 
   TableBaseName:
     Type: String
-    Default: customers-orders
+    Default: vendor-orders
     Description: Base name of the table (final name = <base>-<env>)
 
 # ---------------------------------------------------------------------------
